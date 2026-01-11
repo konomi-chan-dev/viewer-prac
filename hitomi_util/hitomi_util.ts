@@ -38,7 +38,7 @@ export let gg = {
   b: ''
 }
 
-let galleryinfo: GalleryInfo = {
+export let galleryinfo: GalleryInfo = {
     related: [],
     galleryurl: '',
     files: [],
@@ -65,7 +65,7 @@ export async function downloadGGJS(): Promise<void> {
     eval(await res.text());
 }
 
-async function downloadGalleryInfoJS(bookId: number): Promise<void> {
+export async function downloadGalleryInfoJS(bookId: number): Promise<void> {
     const res = await api.get(`${RESOURCE_ROOT}/galleries/${bookId}.js`);
     if (!res.ok) {
         throw new Error(`Failed to fetch gallery info JS for book ID ${bookId}: ${res.status} ${res.statusText}`);
