@@ -1,3 +1,4 @@
+import PQueue from "p-queue";
 import type { ImageInfo, GalleryInfo } from "./types";
 import ky from 'ky';
 
@@ -16,18 +17,6 @@ const api = ky.create({
 const HITOMI_ROOT = 'https://hitomi.la/'
 const RESOURCE_ROOT = 'https://ltn.gold-usergeneratedcontent.net';
 const GGJS_URL = `${RESOURCE_ROOT}/gg.js`;
-
-
-function getFetchOptions(Referer: string = HITOMI_ROOT) {
-    return {
-    headers: {
-        Referer: HITOMI_ROOT,
-        'User-Agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
-    }
-}
-}
-
 const domain2 = 'gold-usergeneratedcontent.net';
 
 export let gg = {
@@ -75,7 +64,7 @@ export async function downloadGalleryInfoJS(bookId: number): Promise<void> {
     eval(galleryInfoJS);
 }
 
-export async function getBookImageLinks(bookdId: number): Promise<string[]> {
+export async function downloadBookImages(bookId: number, concurrency: number = 10): Promise<string[]> {
     try{
         await downloadGGJS();
     }catch(error){
@@ -84,7 +73,7 @@ export async function getBookImageLinks(bookdId: number): Promise<string[]> {
     }
 
     try{
-        await downloadGalleryInfoJS(bookdId);
+        await downloadGalleryInfoJS(bookId);
     }catch(error){
         console.error(error);
         return [];
@@ -93,9 +82,7 @@ export async function getBookImageLinks(bookdId: number): Promise<string[]> {
     console.log(galleryinfo);
 
     for (const image of galleryinfo.files) {
-        const imageUrl = url_from_url_from_hash(bookdId, image, 'webp', '', '');
-        console.log(imageUrl);
-        console.log(getFetchOptions(`https://hitomi.la`))
+        const imageUrl = url_from_url_from_hash(bookId, image, 'webp', '', '');
         const res = await api.get(imageUrl);
         console.log(res.status, res.statusText);
         
@@ -108,11 +95,20 @@ export async function getBookImageLinks(bookdId: number): Promise<string[]> {
         }
     }
 
+    const queue = new PQueue({concurrency: concurrency});
+
+    const taks = galleryinfo.files.map((image) => {
+        return queue.add(async () => {
+            const imageUrl = url_from_url_from_hash(bookId, image, 'webp', '', '');
+            const res = await api.get(imageUrl);
+            
+        });
+    });
 
     return [];
 }
 
-function url_from_url_from_hash(galleryid: number, image: ImageInfo, dir: string, ext: string, base: string) {
+export function url_from_url_from_hash(galleryid: number, image: ImageInfo, dir: string, ext: string, base: string) {
         if ('tn' === base) {
                 return url_from_url('https://a.'+domain2+'/'+dir+'/'+real_full_path_from_hash(image.hash)+'.'+ext, base, '');
         }
