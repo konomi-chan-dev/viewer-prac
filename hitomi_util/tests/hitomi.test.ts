@@ -1,5 +1,5 @@
 import {expect, test, describe} from 'bun:test';
-import { downloadGalleryInfoJS, downloadGGJS, gg, galleryinfo, url_from_url_from_hash } from '../hitomi_util';
+import { downloadGalleryInfoJS, downloadGGJS, gg, galleryinfo, url_from_url_from_hash, collectGalleryIds } from '../hitomi_util';
 import PQueue from 'p-queue';
 import ky from 'ky';
 
@@ -54,4 +54,16 @@ describe('book dl', () => {
     });
 });
 
+describe('gallery id collection', () => {
+    test('should collect gallery IDs without errors', async () => {
+        const galleryIds = await collectGalleryIds({
+            type: 'all',
+            name: '',
+            populer: 'week',
+            language: 'japanese',
+            page: 1
+        })
+        expect(galleryIds.length).toBeGreaterThan(0);
+    });
+});
 

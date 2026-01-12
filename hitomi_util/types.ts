@@ -43,3 +43,10 @@ export type GalleryInfo = {
     
     files: ImageInfo[];
 }
+export type GallerySearchOption = {
+    type: string;
+    name: string;
+    populer: 'week' | 'month' | 'year' | '';
+    language: string;
+    page: number;
+}

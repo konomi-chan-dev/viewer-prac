@@ -1,16 +1,20 @@
 import PQueue from "p-queue";
-import type { ImageInfo, GalleryInfo } from "./types";
+import type { ImageInfo, GalleryInfo, GallerySearchOption } from "./types";
 import ky from 'ky';
+
+function getFetchOptions() {
+    return {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
+        'Referer': 'https://hitomi.la/'
+    }
+}
 
 const api = ky.create({
     retry: {
         limit: 5,
         backoffLimit: 3000
     },
-    headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
-        'Referer': 'https://hitomi.la/'
-    },
+    headers: getFetchOptions(),
     timeout: 10000
 });
 
@@ -106,6 +110,55 @@ export async function downloadBookImages(bookId: number, concurrency: number = 1
     });
 
     return [];
+}
+
+export async function collectGalleryIds(target: GallerySearchOption) {
+    let galleryURL = makeGalleryURL(target);
+    try {
+        const res = await api.get(galleryURL.url, { headers: galleryURL.header });
+        if (!res.ok) {
+            throw new Error(`Failed to fetch gallery page: ${res.status} ${res.statusText}`);
+        }
+
+        const dataView = new DataView(await res.arrayBuffer());
+        const total = dataView.byteLength / 4;
+        const galleryIds: number[] = [];
+        for(let i = 0; i < total; i++){
+            galleryIds.push(dataView.getInt32(i * 4, false));
+        }
+        return galleryIds;
+
+    } catch (error) {
+        console.error('Error collecting gallery IDs:', error);
+    }
+    return [];
+}
+
+export function makeGalleryURL(searchOption: GallerySearchOption) {
+    let url = RESOURCE_ROOT + '/';
+    if(searchOption.type !== 'all'){
+        url += searchOption.type + '/';
+    }
+    if(searchOption.populer !== ''){
+        url += 'popular/'
+        if (searchOption.type !== 'all'){
+            url += searchOption.populer + '/';
+        }
+    }
+    url += searchOption.type === 'all' ? searchOption.populer : searchOption.name;
+    url += `-${searchOption.language}.nozomi`;
+
+    url += '?page=' + searchOption.page;
+
+    let header: Record<string, string> = getFetchOptions();
+    const startByte = (searchOption.page - 1) * 25 * 4;
+    const endByte = startByte + 25 * 4 - 1;
+    header['Range'] = `bytes=${startByte}-${endByte}`;
+
+    return {
+        url: url,
+        header: header
+    }
 }
 
 export function url_from_url_from_hash(galleryid: number, image: ImageInfo, dir: string, ext: string, base: string) {
