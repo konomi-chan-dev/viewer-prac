@@ -1,5 +1,5 @@
 import {expect, test, describe} from 'bun:test';
-import { downloadGalleryInfoJS, downloadGGJS, gg, galleryinfo, url_from_url_from_hash, collectGalleryIds } from '../hitomi_util';
+import { downloadGalleryInfoJS, downloadGGJS, gg, url_from_url_from_hash, collectGalleryIds } from '../hitomi_util';
 import PQueue from 'p-queue';
 import ky from 'ky';
 
@@ -15,7 +15,7 @@ describe('ggjs', () => {
 describe('galleryinfo', () => {
     test('should download gallery info JS without errors', async () => {
         await downloadGGJS();
-        await downloadGalleryInfoJS(TARGET_BOOK_ID);
+        const galleryinfo = await downloadGalleryInfoJS(TARGET_BOOK_ID);
         expect(galleryinfo.galleryurl).not.toEqual('');
     });
 });
@@ -35,7 +35,7 @@ describe('book dl', () => {
 
     test('should download book images without errors', async () => {
         await downloadGGJS();
-        await downloadGalleryInfoJS(TARGET_BOOK_ID);
+        const galleryinfo = await downloadGalleryInfoJS(TARGET_BOOK_ID);
         expect(galleryinfo.files.length).toBeGreaterThan(0);
 
         

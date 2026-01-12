@@ -31,24 +31,6 @@ export let gg = {
   b: ''
 }
 
-export let galleryinfo: GalleryInfo = {
-    related: [],
-    galleryurl: '',
-    files: [],
-    language_localname: '',
-    blocked: false,
-    tags: [],
-    title: '',
-    language: '',
-    type: "",
-    language_url: "",
-    date: "",
-    groups: null,
-    artists: null,
-    parodys: null,
-    characters: null
-};
-
 export async function downloadGGJS(): Promise<void> {
     const res = await api.get(GGJS_URL);
     if (!res.ok) {
@@ -58,14 +40,15 @@ export async function downloadGGJS(): Promise<void> {
     eval(await res.text());
 }
 
-export async function downloadGalleryInfoJS(bookId: number): Promise<void> {
+export async function downloadGalleryInfoJS(bookId: number): Promise<GalleryInfo> {
     const res = await api.get(`${RESOURCE_ROOT}/galleries/${bookId}.js`);
     if (!res.ok) {
         throw new Error(`Failed to fetch gallery info JS for book ID ${bookId}: ${res.status} ${res.statusText}`);
     }
     let galleryInfoJS = await res.text();
-    galleryInfoJS = galleryInfoJS.replace('var ', '');
-    eval(galleryInfoJS);
+    galleryInfoJS = galleryInfoJS.replace('var galleryinfo = ', 'return ');
+    const galleryinfo: GalleryInfo = new Function(galleryInfoJS)();
+    return galleryinfo;
 }
 
 export async function downloadBookImages(bookId: number, concurrency: number = 10): Promise<string[]> {
@@ -77,38 +60,34 @@ export async function downloadBookImages(bookId: number, concurrency: number = 1
     }
 
     try{
-        await downloadGalleryInfoJS(bookId);
-    }catch(error){
-        console.error(error);
-        return [];
-    }
+        const galleryinfo = await downloadGalleryInfoJS(bookId);
 
-    console.log(galleryinfo);
-
-    for (const image of galleryinfo.files) {
-        const imageUrl = url_from_url_from_hash(bookId, image, 'webp', '', '');
-        const res = await api.get(imageUrl);
-        console.log(res.status, res.statusText);
-        
-        if (res.ok) {
-            await Bun.write(`./images/${image.hash}.webp`, await res.arrayBuffer());
-            console.log('Downloaded image:', imageUrl);
-        }
-        else{
-            console.error(`Failed to download image: ${imageUrl} - ${res.status} ${res.statusText}`);
-        }
-    }
-
-    const queue = new PQueue({concurrency: concurrency});
-
-    const taks = galleryinfo.files.map((image) => {
-        return queue.add(async () => {
+        for (const image of galleryinfo.files) {
             const imageUrl = url_from_url_from_hash(bookId, image, 'webp', '', '');
             const res = await api.get(imageUrl);
+            console.log(res.status, res.statusText);
             
-        });
-    });
+            if (res.ok) {
+                await Bun.write(`./images/${image.hash}.webp`, await res.arrayBuffer());
+                console.log('Downloaded image:', imageUrl);
+            }
+            else{
+                console.error(`Failed to download image: ${imageUrl} - ${res.status} ${res.statusText}`);
+            }
+        }
 
+        const queue = new PQueue({concurrency: concurrency});
+
+        const taks = galleryinfo.files.map((image) => {
+            return queue.add(async () => {
+                const imageUrl = url_from_url_from_hash(bookId, image, 'webp', '', '');
+                const res = await api.get(imageUrl);
+                
+            });
+        });
+    }catch(error){
+        console.error(error);
+    }
     return [];
 }
 
