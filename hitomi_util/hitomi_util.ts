@@ -102,13 +102,13 @@ export async function collectGalleryIds(target: GallerySearchOption) {
         for(let i = 0; i < total; i++){
             galleryIds.push(dataView.getInt32(i * 4, false));
         }
-        const totalBooks = Math.ceil(parseInt(res.headers.get('content-range')?.replace(/^[Bb]ytes \d+-\d+\//, '') || '0') / 4 / 25);
-        return {galleryIds, totalBooks};
+        const totalPages = Math.ceil(parseInt(res.headers.get('content-range')?.replace(/^[Bb]ytes \d+-\d+\//, '') || '0') / 4 / 25);
+        return {galleryIds, totalPages};
 
     } catch (error) {
         console.error('Error collecting gallery IDs:', error);
     }
-    return {galleryIds: [], totalBooks: 0};
+    return {galleryIds: [], totalPages: 0};
 }
 
 export function makeGalleryURL(searchOption: GallerySearchOption) {
