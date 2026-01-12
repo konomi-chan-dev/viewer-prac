@@ -63,7 +63,7 @@ describe('gallery id collection', () => {
             language: 'japanese',
             page: 1
         })
-        expect(galleryIds.length).toBeGreaterThan(0);
+        expect(galleryIds.galleryIds.length).toBeGreaterThan(0);
     });
 });
 

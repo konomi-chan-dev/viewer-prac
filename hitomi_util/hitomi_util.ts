@@ -1,6 +1,7 @@
 import PQueue from "p-queue";
 import type { ImageInfo, GalleryInfo, GallerySearchOption } from "./types";
 import ky from 'ky';
+import sharp from "sharp";
 
 function getFetchOptions() {
     return {
@@ -11,11 +12,11 @@ function getFetchOptions() {
 
 const api = ky.create({
     retry: {
-        limit: 5,
-        backoffLimit: 3000
+        limit: 20,
+        backoffLimit: 1000
     },
     headers: getFetchOptions(),
-    timeout: 10000
+    timeout: 20000
 });
 
 const HITOMI_ROOT = 'https://hitomi.la/'
@@ -51,7 +52,7 @@ export async function downloadGalleryInfoJS(bookId: number): Promise<GalleryInfo
     return galleryinfo;
 }
 
-export async function downloadBookImages(bookId: number, concurrency: number = 10): Promise<string[]> {
+export async function downloadBookImages(bookId: number, thumbnail: boolean, n: number = 0, concurrency: number = 10): Promise<(sharp.Sharp | undefined)[]> {
     try{
         await downloadGGJS();
     }catch(error){
@@ -61,30 +62,26 @@ export async function downloadBookImages(bookId: number, concurrency: number = 1
 
     try{
         const galleryinfo = await downloadGalleryInfoJS(bookId);
-
-        for (const image of galleryinfo.files) {
-            const imageUrl = url_from_url_from_hash(bookId, image, 'webp', '', '');
-            const res = await api.get(imageUrl);
-            console.log(res.status, res.statusText);
-            
-            if (res.ok) {
-                await Bun.write(`./images/${image.hash}.webp`, await res.arrayBuffer());
-                console.log('Downloaded image:', imageUrl);
-            }
-            else{
-                console.error(`Failed to download image: ${imageUrl} - ${res.status} ${res.statusText}`);
-            }
-        }
-
         const queue = new PQueue({concurrency: concurrency});
-
-        const taks = galleryinfo.files.map((image) => {
+        const tasks = galleryinfo.files.slice(0, n > 0 ? n : galleryinfo.files.length).map((image, index) => {
             return queue.add(async () => {
-                const imageUrl = url_from_url_from_hash(bookId, image, 'webp', '', '');
-                const res = await api.get(imageUrl);
-                
+                let imageUrl = url_from_url_from_hash(bookId, image, thumbnail ? index == 0 ? 'webpbigtn' : 'webpsmalltn' : 'webp', thumbnail ? 'webp' : '', thumbnail ? 'tn' : '');
+                if(thumbnail){
+                    imageUrl = url_from_url(imageUrl, 'tn', '');
+                }
+                try{
+                    const res = await api.get(imageUrl);
+                    if(res.ok) {
+                        return sharp(await res.arrayBuffer())
+                    }
+                }catch(error){
+                    console.error(`Error downloading image ${imageUrl}:`, error);
+                }
             });
         });
+
+        return await Promise.all(tasks);
+
     }catch(error){
         console.error(error);
     }
@@ -105,12 +102,13 @@ export async function collectGalleryIds(target: GallerySearchOption) {
         for(let i = 0; i < total; i++){
             galleryIds.push(dataView.getInt32(i * 4, false));
         }
-        return galleryIds;
+        const totalBooks = Math.ceil(parseInt(res.headers.get('content-range')?.replace(/^[Bb]ytes \d+-\d+\//, '') || '0') / 4 / 25);
+        return {galleryIds, totalBooks};
 
     } catch (error) {
         console.error('Error collecting gallery IDs:', error);
     }
-    return [];
+    return {galleryIds: [], totalBooks: 0};
 }
 
 export function makeGalleryURL(searchOption: GallerySearchOption) {
